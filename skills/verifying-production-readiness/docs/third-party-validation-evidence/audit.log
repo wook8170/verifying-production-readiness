@@ -1,0 +1,12 @@
+Angular: Template and Attribute Namespace Sanitization Bypass (XSS) - https://github.com/advisories/GHSA-f3m7-gqxr-g87x
+@angular/core: Angular Template and Dynamic Component Namespace Bypass leading to Cross-Site Scripting (XSS) - https://github.com/advisories/GHSA-692r-grfm-v8x7
+Angular Client Hydration DOM Clobbering & Response-Cache Poisoning - https://github.com/advisories/GHSA-rgjc-h3x7-9mwg
+Angular i18n: Cross-Site Scripting (XSS) via event-handler attributes - https://github.com/advisories/GHSA-jj27-h5hq-8x99
+fix available via `npm audit fix --force`
+Will install @angular/core@21.2.21, which is a breaking change
+node_modules/@angular/core
+
+3 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
