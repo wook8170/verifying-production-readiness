@@ -107,12 +107,29 @@ for _c in awk grep sed mktemp; do
   command -v "$_c" >/dev/null 2>&1 || { echo "필수 도구가 없다: $_c — 이 환경에서는 검사할 수 없다(대장 문제가 아니다)"; exit 2; }
 done
 
-STRICT=0
-case "${1:-}" in
-  -h|--help) usage; exit 0 ;;
-  --strict) STRICT=1; shift ;;
-esac
-TARGET="${1:-}"
+# 이 스크립트가 만드는 파일은 임시 사본뿐이고, 그 내용은 **아직 게시하지 않은 출하 검증
+# 리포트 전문**(미공개 결함 포함)이다. mktemp 는 0600 을 보장하지만 파생 파일(.cond/.sum/.sib)
+# 은 리다이렉트로 생성돼 umask 를 탄다 — 공유 /tmp(TMPDIR 미설정 CI·cron)에서 lint 실행
+# 동안 월드 리더블이 됐다(자기감사 VPR-25). 전 산출물을 0600 으로 강제한다.
+umask 077
+
+# 인자 파싱은 순서 무관 + 미지 인자 거부(자기감사 VPR-22): 예전에는 $1 만 봐서
+# `ledger-lint.sh <대상> --strict` 의 --strict 가 **조용히 무시**됐다 — vpr 도움말이
+# 가르치는 순서가 정확히 그 형태였고, 사용자는 범위 제한이 적용된 줄 알고 게시한다.
+# 통제가 소리 없이 꺼지는 것은 통제가 없는 것보다 나쁘다. 오타(--strcit)·쓰레기 인자도
+# 수용하지 않는다 — 미지 입력은 fail-closed(exit 2).
+STRICT=0; TARGET=""
+for _arg in "$@"; do
+  case "$_arg" in
+    -h|--help) usage; exit 0 ;;
+    --strict) STRICT=1 ;;
+    -*) echo "알 수 없는 옵션: $_arg — 사용법은 --help"; exit 2 ;;
+    *) if [ -n "$TARGET" ]; then
+         echo "대상은 하나만 받는다: '$TARGET' 뒤에 '$_arg' — 사용법은 --help"; exit 2
+       fi
+       TARGET="$_arg" ;;
+  esac
+done
 [ -n "$TARGET" ] || { usage; exit 2; }
 # 디렉터리를 주면 정식 모드의 `ledger.md` → 경량 모드의 `readiness.md` 순으로 찾는다.
 # 예전에는 ledger.md 만 봤다 — 그래서 퀵스타트가 안내하는 `vpr lint <프로젝트>` 가 경량
@@ -138,6 +155,19 @@ BASE=$(cd "$(dirname "$LEDGER")" && pwd -P)
 # 이걸 기준에 넣지 않으면 사람들이 CWD 를 맞춰 실행하게 되고, 그 순간 판정이 실행 위치의
 # 함수가 된다(그 상태를 실측으로 확인했다 — 같은 대장이 통과/100위반/102위반).
 REPO_ROOT=$(git -C "$BASE" rev-parse --show-toplevel 2>/dev/null || true)
+# 대상이 git 저장소가 아니면 저장소 루트 기준이 없어, 정식 모드 기본 배치
+# (<대상>/docs/release-readiness/<날짜>/)에서 --strict 가 프로젝트 소스를 어떤 표기로도
+# 인용할 수 없었다(자기감사 VPR-10). 이 배치는 new-report.sh 가 만드는 이 스킬 자신의
+# 레이아웃이므로, git 이 없을 때는 그 상위(대상 루트)를 저장소 루트로 삼는다.
+if [ -z "$REPO_ROOT" ]; then
+  case "$BASE" in
+    */docs/release-readiness/*) REPO_ROOT="${BASE%/docs/release-readiness/*}" ;;
+  esac
+fi
+# --strict 물리 경계(자기감사 VPR-09): 렉시컬 `..` 차단만으로는 리포트 안 심볼릭 링크가
+# 밖의 파일을 끌어온다. BASE 는 pwd -P 라 이미 물리 경로, REPO_ROOT 도 물리로 고정해 둔다.
+RROOT_REAL=""
+[ -n "$REPO_ROOT" ] && RROOT_REAL=$(cd "$REPO_ROOT" 2>/dev/null && pwd -P || true)
 # 대장 파일의 절대 경로 — 자기 인용 판정은 여기에만 건다. 상대/절대 어느 쪽으로 호출해도
 # 같은 판정이 나와야 한다(호출 형태가 판정을 바꾸면 그것도 비결정이다).
 LEDGER_ABS="$BASE/$(basename "$LEDGER")"
@@ -150,8 +180,14 @@ LEDGER_ABS="$BASE/$(basename "$LEDGER")"
 strip_fences() {
   awk '/^[[:space:]]*(```|~~~)/ { f = !f; next } !f' "$1"
 }
+# 인터럽트에도 임시파일이 남지 않게: ① trap 을 **파일 생성 전에** 건다 ② 파생 파일
+# (COND_SCAN·SUM_STRIP·SIB_STRIP)은 mktemp 를 다시 부르지 않고 **WORK 이름에서 파생**한다 —
+# mktemp 의 「파일 생성 → 변수 대입」 사이 경합 창에서 TERM 이 오면 trap 이 빈 이름을
+# 지우는 누수가 있었다(자기감사 VPR-19: 13/25 → VPR-23: SIB_STRIP 3/50 실측). 파생 이름은
+# 대입이 생성보다 먼저라 창이 없다. WORK 자체의 mktemp 창 하나만 남는다(실측 0/50).
+WORK=""; COND_SCAN=""; SUM_STRIP=""; SIB_STRIP=""
+trap 'rm -f "$WORK" "$COND_SCAN" "$SUM_STRIP" "$SIB_STRIP"' EXIT
 WORK=$(mktemp "${TMPDIR:-/tmp}/vprlint.XXXXXX") || exit 2
-trap 'rm -f "$WORK"' EXIT
 strip_fences "$LEDGER" > "$WORK"
 
 VIOL=0
@@ -257,6 +293,13 @@ scan_citations() {
     case "$t" in
       */*|*.md|*.ts|*.js|*.py|*.sh|*.swift|*.log|*.png|*.jpg|*.txt|*.json|*.yml|*.yaml|*.csv|*.html|*.out|*.jsonl|*.har|*.xml|*.pdf|*.svg)
         f=""
+        # --strict: `..` 세그먼트가 든 상대경로는 「리포트·저장소 안」이 아니다 — BASE 기준
+        # 해석이 리포트 밖으로 탈출해 README 의 --strict 범위 규정이 안 걸리던 구멍
+        # (자기감사 VPR-06: `../../../../etc/passwd:1` 이 유효 실측으로 계수됐다).
+        # 같은 파일이 정말 저장소 안이면 저장소 루트 기준 상대경로로 다시 쓰면 된다.
+        if [ "$STRICT" = 1 ]; then
+          case "$t" in ..|../*|*/..|*/../*) CIT_OUT="$CIT_OUT $tok"; continue ;; esac
+        fi
         # 기준 순서 고정: 리포트 디렉터리 → 저장소 루트 → 절대경로. CWD 는 쓰지 않는다.
         if [ -f "$BASE/$t" ]; then f="$BASE/$t"
         elif [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/$t" ]; then f="$REPO_ROOT/$t"
@@ -270,6 +313,16 @@ scan_citations() {
              esac
         fi
         [ -n "$f" ] || continue
+        # --strict: 인용 파일의 **물리 경로**가 리포트 디렉터리·저장소 루트 안이어야 한다.
+        # 렉시컬 검사만으로는 evidence/ 안 심볼릭 링크(→ /etc/passwd)가 밖의 파일을 유효
+        # measured 로 계수했다(자기감사 VPR-09). readlink -f 실패 시 렉시컬로 폴백.
+        if [ "$STRICT" = 1 ]; then
+          RP=$(readlink -f -- "$f" 2>/dev/null || printf '%s' "$f")
+          IN=0
+          case "$RP" in "$BASE"/*) IN=1 ;; esac
+          [ -n "$RROOT_REAL" ] && case "$RP" in "$RROOT_REAL"/*) IN=1 ;; esac
+          if [ "$IN" != 1 ]; then CIT_OUT="$CIT_OUT $tok"; continue; fi
+        fi
         # 자기 인용(대장이 자기 자신을 가리킴)의 취급 — 두 갈래로 나눈다.
         #  · R1(인용 무결)에서는 **유효로 인정**한다. 대장 자신이 증거인 결함이 실재한다
         #    (예: 「lint 가 이 대장의 어떤 ID 를 건너뛴다」). 막으면 과차단이다 —
@@ -389,13 +442,15 @@ while IFS= read -r line; do
   # R7 — 인용한 증거가 0바이트 파일이거나 공백 줄이면 위반 (measurement theater 비용 상승)
   if [ "$GRADE" = "measured" ]; then
     scan_citations "$EV $CLOSE"
-    if [ "$CIT_VALID" -eq 0 ] && [ -z "$CIT_EMPTY" ] && [ -z "$CIT_BLANK" ]; then
+    # CIT_OUT 이 있으면 「부재」가 아니라 「범위 밖」이다 — 실존하는 파일을 「파일 부재」로
+    # 오발화하면 사용자가 엉뚱한 원인을 쫓는다(자기감사 VPR-16). strict 메시지가 정본.
+    if [ "$CIT_VALID" -eq 0 ] && [ -z "$CIT_EMPTY" ] && [ -z "$CIT_BLANK" ] && [ -z "${CIT_OUT:-}" ]; then
       fail "R1 [$ID] measured 인데 유효한 파일 근거가 없다(파일 부재 또는 줄 번호가 파일 길이 초과) — claimed 로 강등하거나 evidence 를 남겨라"
     fi
     [ "$CIT_EXT" -eq 0 ] || MEASURED_OK=$((MEASURED_OK + 1))   # R8 은 외부 증거만 센다
     [ -z "$CIT_EMPTY" ] || fail "R7 [$ID] 인용 증거 파일이 비어 있다(0바이트 또는 공백뿐):$CIT_EMPTY — 실측 출력을 파일에 남겨라"
     [ -z "$CIT_BLANK" ] || fail "R7 [$ID] 파일:줄 인용이 공백 줄을 가리킨다:$CIT_BLANK — 실제 근거 줄을 인용하라"
-    [ -z "${CIT_OUT:-}" ] || fail "R1 [$ID] --strict: 리포트·저장소 밖 인용:$CIT_OUT — 증거를 evidence/ 로 복사해 리포트와 함께 옮겨 다니게 하라"
+    [ -z "${CIT_OUT:-}" ] || fail "R1 [$ID] --strict: 리포트·저장소 밖 인용:$CIT_OUT — 증거를 evidence/ 로 복사하거나 저장소 루트 기준 상대경로로 적어라(대상이 git 저장소가 아니고 정식 배치도 아니면 저장소 기준을 세울 수 없다)"
   fi
 
   # R2 — verified 는 닫은 증거 필수 (문제없음 행(심각도 —)은 예외)
@@ -422,7 +477,13 @@ if [ "$ROWS" -eq 0 ]; then
     echo "— $VIOL 건 위반. 유효한 대장 행이 하나도 없다 — 위 지적을 먼저 고쳐라."
     exit 1
   fi
-  echo "대장 데이터 행이 없습니다(표 형식 확인): $LEDGER"; exit 2
+  # 행 0 은 그 자체로 오류가 아니다 — 결함 0건의 청정 감사(정상 결과)일 수도, 갓 만든
+  # 뼈대(판정 불가)일 수도 있다. 어느 쪽인지는 아래 판정급 규칙이 가른다: GO 면 R8 이
+  # 실측을 요구하고, 판정 불가면 부담이 없다. 예전에는 여기서 exit 2 로 조기 종료했는데
+  # 그러면 R8·R10·R11·R13 이 한 줄도 실행되지 않아 「GO + 빈 대장」이 lint 를 통과하고
+  # 렌더 게이트(exit 1 만 차단)까지 지나 게시됐다 — 자기감사 VPR-01(BLOCKER) 실측.
+  # 같은 유형(판정 전 조기 이탈)의 세 번째 발생이었다. 여기서는 계속 진행한다.
+  :
 fi
 
 # ── R9 — 게이트 표의 「실측」칸 ─────────────────────────────────────
@@ -488,7 +549,7 @@ while IFS= read -r line; do
             if [ "$CIT_EXT" -gt 0 ]; then
               GATE_MEASURED=$((GATE_MEASURED + 1))
             elif ! printf '%s' "$GCELL" | grep -q '[0-9]'; then
-              fail "R9 [게이트 ${GID:-?}] 실측 칸에 수치도 유효 인용도 없다('$GCELL') — 서술은 실측이 아니다"
+              fail "R9 [게이트 ${GID:-?}] 실측 칸에 수치도 유효 인용도 없다('$GCELL') — 서술형 실측(「동일」·「통과」)은 인용을 붙여라: 예) 동일 (evidence/diff.log:1)"
             fi ;;
         esac
       fi ;;
@@ -531,15 +592,76 @@ else
       # 「조건 0건」은 조건 명시가 아니라 **자기모순**이다 — 조건이 없으면 그냥 「출하 가능」
       # 이거나(그러면 R8 이 실측을 요구한다) 「판정 불가」다. 이 문법 모순을 잡는 것이
       # 조건부를 R8 의 우회로로 쓰지 못하게 하는 마지막 고리다.
-      if grep -qE '조건[^0-9]{0,8}0[ ]*건|조건 *: *없음|남은 조건 *0|[Nn]o conditions|0 conditions' "$WORK"; then
-        fail "R11 판정 '조건부 출하 가능' 인데 조건이 0건이라고 적혀 있다 — 조건이 없으면 '출하 가능'(실측 필요) 이거나 '판정 불가' 다. 문법 모순"
-      elif ! { grep -qE '조건[^0-9]{0,8}[1-9][0-9]*[ ]*건|[1-9][0-9]* *conditions?' "$WORK" \
-               || awk '/^#+ *(조건|Conditions?)/ { f = 1; next }
-                       f && /^[-*0-9]/ { found = 1; exit }
-                       f && /^#/ { f = 0 }
-                       END { exit found ? 0 : 1 }' "$WORK"; }; then
-        fail "R11 판정 '조건부 출하 가능' 인데 조건이 어디에도 명시돼 있지 않다 — 「조건 N건」 또는 「## 조건」 아래 목록으로, 누가·무엇을·어떻게 확인하면 풀리는지 적어라(적을 수 없으면 '판정 불가')"
-      fi ;;
+      # R11 조건 탐색(자기감사 VPR-07·08·12~15·17 누적 수정):
+      # · 범위(VPR-12): 템플릿은 조건을 00-summary.md 에 적으라고 가르친다 — R10 이 게이트
+      #   표를 「형제 파일이든 무방」으로 보는 것과 같은 이유로, 대장 + 형제 리포트 가족
+      #   전체에서 찾는다(펜스 제외). 정식 모드 조건부가 구조적으로 lint 불통이던 원인.
+      # · 헤딩(VPR-08): H2 이하만 조건 절 후보 — H1 문서 제목 「# 조건부 …」 오발화 차단.
+      #   인용부호(> ) 는 벗겨서 본다(VPR-15 — 템플릿 요약 골격이 인용부호를 쓴다).
+      #   「조건부」·「무조건」을 지운 뒤에도 「조건」이 남아야 조건 절이다(VPR-17).
+      # · 내용(VPR-13·14): 조건 절 안의 비어 있지 않은 줄이면 표기(목록·표·①②·산문)를
+      #   가리지 않는다 — 진짜 조건 헤딩 아래라면 형식이 아니라 존재가 중요하다.
+      #   이 검사는 렉시컬이다(내용의 진위·실행 가능성은 재진입 세션의 몫 — README 한계 절).
+      COND_SCAN="$WORK.cond"
+      cat "$WORK" > "$COND_SCAN"
+      for csib in "$BASE"/*.md; do
+        [ -f "$csib" ] || continue
+        [ "$csib" = "$LEDGER_ABS" ] && continue
+        is_report_sibling "$csib" || continue
+        strip_fences "$csib" >> "$COND_SCAN"
+      done
+      # 「조건 0건」 자기모순 검사의 범위는 **판정을 지는 파일**(대장 + 00-summary.md)로
+      # 좁힌다 — 형제 가족 전체로 넓히면 축 파일의 「임계값 미충족 조건 0건」·수정 라운드
+      # 이력의 「남은 조건 0」 같은 무관 문구가 조건을 정확히 명시한 정당한 리포트를
+      # 차단한다(자기감사 VPR-18 과차단 실측). 존재 검사(아래)는 가족 전체가 맞다 —
+      # 템플릿이 조건을 요약에 적으라고 가르치기 때문이다(VPR-12).
+      # 모순 검사 범위 = **게시물에 실리는 마크다운 전부** — 선택된 대장 + 00-summary.md +
+      # readiness.md(대장과 별개로 공존할 때). 예전에는 대장·요약만 봐서, ledger.md 와
+      # readiness.md 가 공존하는 디렉터리에서 readiness.md 의 「남은 조건 0건」이 검사는
+      # 비켜 가고 렌더에는 실렸다(자기감사 VPR-26 실측 — 문서의 「= 게시 범위」 등식이
+      # 거짓이 되는 반례). 게시되는 파일은 전부 검사한다.
+      # 모순 스캔의 오발화 방지(자기감사 VPR-27 과차단): ① 표 행은 뺀다 — 대장·게이트 표
+      # 셀의 「재현 조건: 없음」은 출하 조건에 대한 주장이 아니다(판정줄 스캔 :grep -v '^|'
+      # 과 같은 규약). ② 이력 절(## 이력/History)은 뺀다 — 「남은 조건 0건 이었다」는 과거
+      # 서술이다. ③ 「조건」 앞에 낱말 경계(행머리/공백)를 요구한다 — 「전제조건 0건」류
+      # 합성어 차단. 제외 줄은 지우지 않고 비워 줄 번호를 보존한다(위치 표기용).
+      # 낱말 경계는 「합성어(앞이 한글 음절)만 배제」다 — 행머리·공백 외에 강조·인용·괄호
+      # 기호(**·「」·`·(·탭·_ 등)도 정당한 접두다. 예전 (^| ) 경계는 「**조건 0건**」 같은
+      # 흔한 마크다운 표기의 진짜 모순 7형을 놓쳤다(자기감사 VPR-28 HIGH — v0.14.0 대비 회귀,
+      # 게시까지 도달 실측). 다국어 인용부호는 바이트 브래킷에 못 넣으므로 대안으로 나열한다.
+      CB="(^|[[:space:]]|[]*_~<>#=+.,;:!?/\\\\(\"'\`[-]|「|『|“|‘|»|·)"
+      # 「조건: 없음」 분기는 조건과 콜론 **사이**의 강조 기호·괄호 주석도 허용해야 한다 —
+      # 템플릿이 가르치는 표기 「**남은 조건**(조건부일 때만): 없음」이 이 틈으로 통과해
+      # 조건 0건짜리 조건부 GO 가 게시까지 도달했다(자기감사 VPR-29 HIGH, 3버전 잠복).
+      # 존재 검사(아래 인라인 grep)가 굵게 표기를 인정하는 것과 대칭이어야 한다.
+      CONTRA_PAT="${CB}조건[^0-9]{0,8}0[ ]*건|${CB}조건[]*_\`」』\"'[-]*( *\\([^)]*\\))? *: *(해당 *)?없음|남은 조건 *0|[Nn]o conditions|${CB}0 conditions"
+      contra_filter() {
+        awk '/^#/ { hist = ($0 ~ /이력|[Hh]istory/) ? 1 : 0 }
+             hist || /^\|/ { print ""; next }
+             { print }' "$1"
+      }
+      CONTRA=$(contra_filter "$WORK" | grep -nE "$CONTRA_PAT" | head -1 | sed 's|^|대장 |')
+      for cfile in 00-summary.md readiness.md ledger.md; do
+        [ -n "$CONTRA" ] && break
+        [ -f "$BASE/$cfile" ] || continue
+        [ "$BASE/$cfile" = "$LEDGER_ABS" ] && continue
+        SUM_STRIP="$WORK.sum"
+        strip_fences "$BASE/$cfile" > "$SUM_STRIP"
+        CONTRA=$(contra_filter "$SUM_STRIP" | grep -nE "$CONTRA_PAT" | head -1 | sed "s|^|$cfile:|")
+      done
+      if [ -n "$CONTRA" ]; then
+        fail "R11 판정 '조건부 출하 가능' 인데 조건이 0건이라고 적혀 있다($CONTRA) — 조건이 없으면 '출하 가능'(실측 필요) 이거나 '판정 불가' 다. 문법 모순"
+      elif ! { grep -qE '조건[^0-9]{0,8}[1-9][0-9]*[ ]*건|[1-9][0-9]* *conditions?' "$COND_SCAN" \
+               || grep -qE '\*\*남은 *조건\*\*[^:|]*:[[:space:]]*[^[:space:]]' "$COND_SCAN" \
+               || awk '{ line = $0; sub(/^(> ?)+/, "", line) }
+                       line ~ /^##/ { t = line; gsub(/조건부|무조건/, "", t)
+                                      f = (t ~ /조건|[Cc]onditions?/) ? 1 : 0; next }
+                       line ~ /^#/ { f = 0; next }
+                       f && line ~ /[^ \t]/ { found = 1; exit }
+                       END { exit found ? 0 : 1 }' "$COND_SCAN"; }; then
+        fail "R11 판정 '조건부 출하 가능' 인데 조건이 대장·형제 리포트 어디에도 명시돼 있지 않다 — 「조건 N건」, 「**남은 조건**: …」, 또는 「## 조건」류 헤딩 아래 내용으로, 누가·무엇을·어떻게 확인하면 풀리는지 적어라(적을 수 없으면 '판정 불가')"
+      fi
+      rm -f "$COND_SCAN" ;;
     "출하 불가"*|"판정 불가"*|"NO-GO"*|"UNVERIFIABLE"*) ;;       # 공존 가능
     "출하 가능"*|"GO"|"GO "*|"GO("*)
       [ "$OPEN_BLOCKERS" -eq 0 ] || fail "R6 판정 '출하 가능(GO)' 인데 open BLOCKER $OPEN_BLOCKERS 건"
@@ -566,7 +688,7 @@ if [ -n "${VTXT:-}" ]; then
     # 붙이면 정식 모드 lint 가 2.5배 느려진다(실측). 펜스 안 예시만 있는 파일은 이 선별을
     # 통과해도 아래 strip_fences 사본에서 0건으로 걸러진다 — 선별은 상위집합이라 안전하다.
     grep -qE '\*\*(판정|Verdict):?\*\*|^#+[[:space:]]*(판정|Verdict)[[:space:]]*:?[[:space:]]*$|^\|[[:space:]*_`]*(판정|Verdict)[[:space:]*_`]*\|' "$sib" || continue
-    SIB_STRIP=$(mktemp "${TMPDIR:-/tmp}/vprsib.XXXXXX") || exit 2
+    SIB_STRIP="$WORK.sib"
     strip_fences "$sib" > "$SIB_STRIP"
     SBN=$(basename "$sib")
     SVN=$(verdict_count "$SIB_STRIP")
@@ -642,7 +764,9 @@ if [ -n "$AXIS_DECL" ]; then
 fi
 
 if [ "$VIOL" -eq 0 ]; then
-  echo "✓ 대장 무결 — $ROWS 행, R1–R13 통과 (open BLOCKER $OPEN_BLOCKERS · 실측 근거 대장 $MEASURED_OK · 게이트 $GATE_MEASURED)"
+  NOTE=""
+  [ "$ROWS" -eq 0 ] && NOTE=" · 대장 0행(결함 0건이면 정상, 뼈대 상태면 채워라)"
+  echo "✓ 대장 무결 — $ROWS 행, R1–R13 통과 (open BLOCKER $OPEN_BLOCKERS · 실측 근거 대장 $MEASURED_OK · 게이트 $GATE_MEASURED)$NOTE"
   exit 0
 else
   echo "— $VIOL 건 위반. measured 지어내기·근거 없는 verified 는 판정을 무효로 만든다."
