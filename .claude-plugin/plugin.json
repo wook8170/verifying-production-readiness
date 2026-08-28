@@ -1,8 +1,15 @@
 {
   "name": "verifying-production-readiness",
-  "version": "0.1.0",
-  "description": "A skill for judging whether a system can ship to production. Verdicts come from observation, not green checkmarks: pin numeric gates before the audit, grade every finding by evidence (claimed / code / measured), drive the real product end-to-end, and keep a defect ledger that survives across sessions. Ships a machine ledger-lint and an HTML report renderer.",
-  "author": { "name": "장욱" },
-  "homepage": "https://github.com/wook8170/verifying-production-readiness",
-  "keywords": ["production-readiness", "release", "go-no-go", "audit", "verification", "quality", "skill"]
+  "version": "0.17.0",
+  "description": "Use when judging whether a system can ship to production — pre-launch sign-off, go/no-go calls, release readiness audits, \"can we ship this?\", \"확인만 하고 올리자\", or when resuming and iterating on a prior readiness report.",
+  "author": {
+    "name": "장욱 (Wook Jang)"
+  },
+  "keywords": [
+    "readiness",
+    "release",
+    "go-no-go",
+    "audit",
+    "quality-gate"
+  ]
 }

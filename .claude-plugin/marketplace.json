@@ -1,23 +1,22 @@
 {
   "name": "verifying-production-readiness",
   "owner": {
-    "name": "장욱"
+    "name": "장욱 (Wook Jang)"
   },
   "metadata": {
-    "description": "Marketplace for verifying-production-readiness — a ship / no-ship production-readiness audit skill",
-    "version": "0.1.0"
+    "description": "Local marketplace for verifying-production-readiness",
+    "version": "0.17.0"
   },
   "plugins": [
     {
       "name": "verifying-production-readiness",
       "source": "./",
-      "description": "Judge whether a system can ship: pin gates before the audit, grade findings by evidence (claimed/code/measured), run the product end-to-end, keep a cross-session defect ledger. Includes a machine ledger-lint and an HTML report renderer.",
-      "version": "0.1.0",
+      "version": "0.17.0",
+      "description": "Use when judging whether a system can ship to production — pre-launch sign-off, go/no-go calls, release readiness audits, \"can we ship this?\", \"확인만 하고 올리자\", or when resuming and iterating on a prior readiness report.",
       "author": {
-        "name": "장욱"
+        "name": "장욱 (Wook Jang)"
       },
-      "keywords": ["production-readiness", "release", "go-no-go", "audit", "verification", "quality"],
-      "category": "development"
+      "category": "workflow"
     }
   ]
 }

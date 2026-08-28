@@ -251,8 +251,10 @@ check "R7: 정상+빈 파일 혼합 인용도 위반(빈 인용 자체가 적신
 # ── 8. 사용법·대상 없음 ───────────────────────────────────────
 check "인자 없음 → exit 2" 2 "사용법" ""
 check "없는 경로 → exit 2" 2 "없습니다" "$TMP/nope"
+# 데이터 행 0 은 오류가 아니다 — 청정 감사·뼈대일 수 있고, 판정급 규칙(R8 등)이 가른다.
+# 예전 계약(빈 대장 = exit 2 조기 종료)이 「GO+0행」 우회(자기감사 VPR-01)를 만들었다.
 D="$TMP/empty"; mkdir -p "$D"; { hdr 0 "조건부 출하 가능"; } > "$D/ledger.md"
-check "데이터 행 없음 → exit 2" 2 "데이터 행" "$D"
+check "데이터 행 없음(위반 0) → 통과 + 0행 노트" 0 "대장 0행" "$D"
 
 # ══ ensure-tools.sh ══════════════════════════════════════════
 ET="$(cd "$(dirname "$0")/.." && pwd)/bin/ensure-tools.sh"
@@ -317,6 +319,27 @@ check_et "--install 이 스킬 설치를 시도한다" 0 "DRYRUN: claude plugin 
 # 설치가 안 됐을 때의 안내는 「축을 빼라」가 아니라 「직접 수행하라」여야 한다.
 check_et "설치 불가여도 축을 빼지 말라고 안내" 1 "도구가 없다는 이유로 축을 빼지 마라" "$SD2" "$BIN:$NOBIN" ""
 
+# ══ 2026-08-27 자기감사(VPR-01~03) 회귀 ═══════════════════════
+# VPR-01(BLOCKER): 대장 0행 조기 종료(exit 2)가 R8·R10·R11·R13 을 통째로 건너뛰어
+# 「GO + 빈 대장」이 lint 와 렌더 게이트(당시 exit 1 만 차단)를 지나 게시됐다.
+# 판정 전 이탈 금지 — 0행이어도 판정급 규칙까지 내려가야 한다. 이 케이스의 부재가
+# 결함이 156건 전건 통과를 뚫고 살아남은 원인이었다(감사 리포트 §5-5).
+D="$TMP/vpr01"; mkdir -p "$D"
+{ hdr 0 "출하 가능"; thead; } > "$D/ledger.md"
+check "VPR-01: GO + 대장 0행 → R8 위반(조기 종료 금지)" 1 "R8" "$D"
+# 반대 방향(과차단 금지, 자기감사 O1): 결함 0건 + 게이트 실측 인용의 청정 감사는 정상 결과다
+D="$TMP/vpr01-clean"; mkdir -p "$D/evidence"; echo "156 passed, 0 failed" > "$D/evidence/test.log"
+{ printf '# 청정 감사\n\n**갱신** 2026-08-27 · **판정** 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n## 게이트 (착수 전 확정)\n| 게이트 | 목표 | 실측 |\n|---|---|---|\n| G1 테스트 | fail 0 | 156/0 — `evidence/test.log:1` |\n\n## 결함 대장\n'
+  thead
+} > "$D/readiness.md"
+check "VPR-01: 청정 감사(GO·0행·게이트 실측) → 통과(과차단 금지)" 0 "대장 무결" "$D/readiness.md"
+# VPR-03: 갓 만든 뼈대를 바로 lint 하는 자연스러운 첫 동작(new → lint)은 통과해야 한다 —
+# 예전에는 exit 2 + 「표 형식 확인」으로 도구가 자기가 만든 표를 사용자 탓했다.
+VPRBIN="$(cd "$(dirname "$0")/.." && pwd)/bin/vpr"
+D="$TMP/vpr03"
+bash "$VPRBIN" new "$D" >/dev/null 2>&1
+check "VPR-03: vpr new 뼈대 → lint 통과(사용자 탓 금지)" 0 "대장 무결" "$D/readiness.md"
+
 # ══ report-html.py ═══════════════════════════════════════════
 RH="$(cd "$(dirname "$0")/.." && pwd)/bin/report-html.py"
 if command -v python3 >/dev/null 2>&1; then
@@ -358,11 +381,13 @@ if command -v python3 >/dev/null 2>&1; then
   check_rh "report-html: lint 위반 대장 → 렌더 거부 exit 1" 1 "" "/dev/null" "$D3/readiness.md"
   # 제목: 코드펜스 안 h1 은 무시
   D4="$TMP/rh-title"; mkdir -p "$D4"
-  printf '```markdown\n# 골격 예시 제목\n```\n\n# 진짜 제목\n본문\n' > "$D4/readiness.md"
+  # fail-closed 렌더 게이트(자기감사 VPR-01) 이후, 렌더 픽스처도 lint 를 통과하는
+  # 최소 유효 대장이어야 한다 — 판정 불가 헤더 한 줄이면 충분하다(실측 부담 없음).
+  printf '```markdown\n# 골격 예시 제목\n```\n\n# 진짜 제목\n\n**갱신** 2026-08-27 · **판정** 판정 불가 · **open BLOCKER** 0 · **open 전체** 0\n\n본문\n' > "$D4/readiness.md"
   check_rh "report-html: 펜스 안 h1 은 제목이 아니다" 0 "<title>진짜 제목</title>" "$D4/report.html" "$D4/readiness.md"
   # evidence 하위 디렉터리(x.png/) 무시 + 문서 골격 태그 부재(Artifact 래핑 계약)
   D5="$TMP/rh-trap"; mkdir -p "$D5/evidence/trap.png"
-  printf '# 골격 계약\n본문\n' > "$D5/readiness.md"
+  printf '# 골격 계약\n\n**갱신** 2026-08-27 · **판정** 판정 불가 · **open BLOCKER** 0 · **open 전체** 0\n\n본문\n' > "$D5/readiness.md"
   check_rh "report-html: evidence 하위 디렉터리 무시" 0 "골격 계약" "$D5/report.html" "$D5/readiness.md"
   if grep -qiE '<!doctype|<html|<body' "$D5/report.html"; then
     FAIL=$((FAIL+1)); echo "FAIL  report-html: 문서 골격 태그 없음 (doctype/html/body 검출됨)"
@@ -374,12 +399,40 @@ if command -v python3 >/dev/null 2>&1; then
   check_rh "report-html: 렌더할 파일 없는 디렉터리 → exit 2" 2 "" "/dev/null" "$D6"
   # 이스케이프 고정: 셀의 <script> 는 &lt; 로 무력화돼야 한다 (순서 회귀 시 XSS)
   D7="$TMP/rh-xss"; mkdir -p "$D7"
-  printf '# 이스케이프\n\n| A |\n|---|\n| <script>alert(1)</script> |\n' > "$D7/readiness.md"
+  printf '# 이스케이프\n\n**갱신** 2026-08-27 · **판정** 판정 불가 · **open BLOCKER** 0 · **open 전체** 0\n\n| A |\n|---|\n| <script>alert(1)</script> |\n' > "$D7/readiness.md"
   check_rh "report-html: 셀 <script> 이스케이프" 0 '&lt;script&gt;' "$D7/report.html" "$D7/readiness.md"
   if grep -q '<script>' "$D7/report.html"; then
     FAIL=$((FAIL+1)); echo "FAIL  report-html: 원시 <script> 잔존 (XSS)"
   else
     PASS=$((PASS+1)); echo "PASS  report-html: 원시 <script> 없음"
+  fi
+  # ── 2026-08-27 자기감사 회귀 (VPR-01 렌더층 · VPR-02) ──
+  # VPR-01 렌더층: lint 미통과(0 아닌 모든 종료코드)는 렌더를 막는다 — fail-closed.
+  D8="$TMP/rh-bypass"; mkdir -p "$D8"
+  { hdr 0 "출하 가능"; thead; } > "$D8/readiness.md"
+  check_rh "report-html: GO+0행 대장 → 렌더 거부(fail-closed)" 1 "" "/dev/null" "$D8/readiness.md"
+  # VPR-02: 경량 모드 산출물만 있는 **디렉터리** 렌더 — readiness.md 를 후보로 해석해야
+  # 한다(문서의 「전형적인 흐름」이 디렉터리 인자다. 예전엔 100% 실패).
+  check_rh "report-html: 경량 디렉터리 렌더(readiness.md만)" 0 "USE-01" "$D2/report.html" "$D2"
+  # ── VPR-05(2R 자기감사): 게이트는 「검사할 수 없으면 거부」 ──
+  # 재현 A: 대장 파일 부재(요약만) — 예전엔 lint 가 호출조차 안 돼 「출하 가능」이 무검사 게시됐다
+  D9="$TMP/rh-noledger"; mkdir -p "$D9"
+  printf '# 요약\n\n**갱신** 2026-08-27 · **판정** 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n' > "$D9/00-summary.md"
+  check_rh "report-html: 대장 없는 디렉터리 → 렌더 거부(VPR-05 A)" 1 "" "/dev/null" "$D9"
+  if [ -f "$D9/report.html" ]; then
+    FAIL=$((FAIL+1)); echo "FAIL  report-html: 거부했는데 산출물이 생겼다(VPR-05 A)"
+  else
+    PASS=$((PASS+1)); echo "PASS  report-html: 거부 시 산출물 미생성(VPR-05 A)"
+  fi
+  # 재현 B: ledger-lint.sh 없는 단독 배치 — 검증 도구 부재도 「미실시 ≠ 통과」로 거부
+  DL="$TMP/rh-nolint"; mkdir -p "$DL/fixture"
+  cp "$RH" "$DL/report-html.py"; cp "$D2/readiness.md" "$DL/fixture/readiness.md"
+  out=$(python3 "$DL/report-html.py" "$DL/fixture/readiness.md" 2>&1); rc=$?
+  if [ "$rc" = 1 ] && [ ! -f "$DL/fixture/report.html" ]; then
+    PASS=$((PASS+1)); echo "PASS  report-html: lint 스크립트 부재 → 렌더 거부(VPR-05 B)"
+  else
+    FAIL=$((FAIL+1)); echo "FAIL  report-html: lint 부재인데 거부 안 함(VPR-05 B, exit=$rc)"
+    printf '%s\n' "$out" | sed 's/^/      /'
   fi
 else
   echo "SKIP  report-html.py (python3 없음)"
@@ -524,6 +577,215 @@ if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "strict"; then
   PASS=$((PASS + 1)); echo "PASS  --strict: 범위 밖 인용 → 위반"
 else
   FAIL=$((FAIL + 1)); echo "FAIL  --strict: 범위 밖 인용을 못 잡았다 (exit=$rc)"
+fi
+# VPR-06(2R 자기감사): `..` 세그먼트 상대경로는 BASE 해석이 리포트 밖으로 탈출해
+# --strict 범위 규정이 안 걸렸다 — 절대경로와 같은 「범위 밖 인용」으로 막아야 한다.
+D="$TMP/strict-esc"; mkdir -p "$D/r"; echo "escaped evidence" > "$D/out.log"
+{ hdr 0 "출하 가능"; thead
+  echo '| E-01 | MED | 05 | 탈출 인용 | verified | measured | `../out.log:1` | `../out.log:1` |'
+} > "$D/r/ledger.md"
+check "기본: .. 상대경로 인용 허용(과차단 방지)" 0 "대장 무결" "$D/r"
+out=$(bash "$LINT" --strict "$D/r" 2>&1); rc=$?
+if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "strict"; then
+  PASS=$((PASS + 1)); echo "PASS  --strict: .. 상대경로 탈출 인용 → 위반 (VPR-06)"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  --strict: .. 상대경로 탈출을 못 잡았다 (exit=$rc)"
+fi
+
+# ══ 3R 자기감사(VPR-07~10) 회귀 ═══════════════════════════════
+# VPR-08(BLOCKER): H1 제목 「# 조건부 …」가 R11 조건 절로 오인돼, 조건 0줄·실측 0건
+# 조건부 판정이 lint·strict·render 를 전부 통과해 게시됐다. H1 은 조건 절이 아니다.
+D="$TMP/vpr08"; mkdir -p "$D"
+{ printf '# 조건부 출하 판정 — 대상 X\n\n**갱신** 2026-08-27 · **판정** 조건부 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n## 게이트 (착수 전 확정)\n| 게이트 | 목표 |\n|---|---|\n| G1 | fail 0 |\n\n## 결함 대장\n'
+  thead
+} > "$D/readiness.md"
+check "VPR-08: 제목 「조건부…」 + 조건 0줄 → R11 위반" 1 "R11" "$D/readiness.md"
+# VPR-07(HIGH): 이 스킬 자신의 템플릿이 권하는 조건 표기와 자연스러운 헤딩이 거부되던 과차단
+mk_cond() { # <dir> <조건 블록>
+  mkdir -p "$1"
+  { printf '# 검증 리포트\n\n**갱신** 2026-08-27 · **판정** 조건부 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n## 게이트 (착수 전 확정)\n| 게이트 | 목표 |\n|---|---|\n| G1 | fail 0 |\n\n'
+    printf '%s\n' "$2"
+    printf '\n## 결함 대장\n'; thead
+  } > "$1/readiness.md"
+}
+mk_cond "$TMP/vpr07a" '**남은 조건**(조건부일 때만): ① 담당자가 스모크 3동작을 확인한다'
+check "VPR-07: 템플릿 권장형(**남은 조건**: ①…) → 통과" 0 "대장 무결" "$TMP/vpr07a/readiness.md"
+mk_cond "$TMP/vpr07b" '## 출하 전 조건
+
+1. 담당자가 스모크 3동작을 확인한다'
+check "VPR-07: 「## 출하 전 조건」+번호 목록 → 통과" 0 "대장 무결" "$TMP/vpr07b/readiness.md"
+mk_cond "$TMP/vpr07c" '## 남은 조건
+
+- 담당자가 롤백 버튼을 실제로 눌러 확인한다'
+check "VPR-07: 「## 남은 조건」+목록 → 통과" 0 "대장 무결" "$TMP/vpr07c/readiness.md"
+# VPR-09(MED): --strict 는 인용의 물리 경로가 리포트·저장소 안이어야 한다(심볼릭 링크 탈출 차단)
+D="$TMP/vpr09"; mkdir -p "$D/evidence"
+ln -s /etc/hosts "$D/evidence/pw.log"
+{ hdr 0 "조건부 출하 가능"; thead
+  echo '| S-01 | MED | 06 | 링크 탈출 | verified | measured | `evidence/pw.log:1` | `evidence/pw.log:1` |'
+} > "$D/ledger.md"
+check "기본: 심볼릭 링크 인용 허용(과차단 방지)" 0 "대장 무결" "$D"
+out=$(bash "$LINT" --strict "$D" 2>&1); rc=$?
+if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "strict"; then
+  PASS=$((PASS + 1)); echo "PASS  --strict: 심볼릭 링크 탈출 인용 → 위반 (VPR-09)"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  --strict: 심볼릭 링크 탈출을 못 잡았다 (exit=$rc)"
+fi
+# VPR-10(MED): 비-git 대상의 정식 기본 배치(docs/release-readiness/<날짜>)에서도
+# 저장소 루트(=대상 루트) 기준 상대경로 인용이 --strict 로 통과해야 한다
+D="$TMP/vpr10/proj"; R="$D/docs/release-readiness/2026-08-27"
+mkdir -p "$D/src" "$R"; seq 5 > "$D/src/app.ts"
+{ hdr 0 "조건부 출하 가능"; thead
+  echo '| C-01 | MED | 08 | 소스 인용 | verified | measured | `src/app.ts:2` | `src/app.ts:2` |'
+} > "$R/ledger.md"
+check "VPR-10: 비-git 정식 배치, 대상 루트 기준 인용 → 통과" 0 "대장 무결" "$R"
+out=$(bash "$LINT" --strict "$R" 2>&1); rc=$?
+if [ "$rc" = 0 ]; then
+  PASS=$((PASS + 1)); echo "PASS  VPR-10: --strict 에서도 대상 루트 인용 통과"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  VPR-10: --strict 가 대상 루트 인용을 막았다 (exit=$rc)"
+  printf '%s\n' "$out" | sed 's/^/      /'
+fi
+
+# ══ 4R 자기감사(VPR-12~17) 회귀 ═══════════════════════════════
+# VPR-12(HIGH): 조건이 형제 리포트(00-summary.md — 템플릿이 지정한 위치)에 있어도 인정.
+# R11 이 대장만 봐서 정식 모드 조건부가 구조적으로 lint 불통이었다.
+D="$TMP/vpr12"; mkdir -p "$D"
+{ printf '# 검증 리포트\n\n**갱신** 2026-08-27 · **판정** 조건부 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n## 게이트 (착수 전 확정)\n| 게이트 | 목표 |\n|---|---|\n| G1 | fail 0 |\n\n## 결함 대장\n'
+  thead
+} > "$D/ledger.md"
+printf '# 요약\n\n**판정** 조건부 출하 가능\n\n**남은 조건**(조건부일 때만): ① 배포 담당이 롤백을 스테이징에서 1회 실행해 확인\n' > "$D/00-summary.md"
+check "VPR-12: 조건이 00-summary.md 에만 있어도 통과" 0 "대장 무결" "$D"
+# VPR-13: 표 형식 조건도 조건 명시다(다른 규격은 전부 표인데 조건만 목록 강제였다)
+mk_cond "$TMP/vpr13" '## 출하 전 조건
+
+| 조건 | 누가 | 확인 방법 |
+|---|---|---|
+| 롤백 1회 실행 | 배포 담당 | 스테이징 로그 확인 |'
+check "VPR-13: 표 형식 조건 → 통과" 0 "대장 무결" "$TMP/vpr13/readiness.md"
+# VPR-14: 템플릿이 가르치는 ①② 기호를 헤딩 아래에 써도 인정(인라인형과 일관)
+mk_cond "$TMP/vpr14" '## 남은 조건
+
+① 배포 담당이 롤백을 스테이징에서 확인한다'
+check "VPR-14: 헤딩 아래 ①② 조건 → 통과" 0 "대장 무결" "$TMP/vpr14/readiness.md"
+# VPR-15: 인용부호(>) 골격의 조건 절도 인정(템플릿 요약 골격이 인용부호를 쓴다)
+mk_cond "$TMP/vpr15" '> ## 남은 조건
+> - 담당자가 스모크 3동작을 확인한다'
+check "VPR-15: 인용부호 조건 절 → 통과" 0 "대장 무결" "$TMP/vpr15/readiness.md"
+# VPR-17: 「조건」을 부분 문자열로만 포함하는 무관한 헤딩(무조건)은 조건 절이 아니다
+mk_cond "$TMP/vpr17" '## 무조건 확인할 것
+
+- 이것은 출하 조건이 아니라 일반 메모다'
+check "VPR-17: 「## 무조건」 헤딩은 조건 절이 아니다 → R11 위반" 1 "R11" "$TMP/vpr17/readiness.md"
+# VPR-18(5R): 「조건 0건」 자기모순 검사는 판정을 지는 파일(대장·00-summary.md)만 —
+# 축 파일의 무관 문구(「임계값 미충족 조건 0건」)가 정당한 조건부 리포트를 차단하면 안 된다
+D="$TMP/vpr18"; mkdir -p "$D"
+{ printf '# 검증 리포트\n\n**갱신** 2026-08-27 · **판정** 조건부 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n## 게이트 (착수 전 확정)\n| 게이트 | 목표 |\n|---|---|\n| G1 | fail 0 |\n\n## 남은 조건\n\n- 담당자가 스모크 3동작을 확인한다\n\n## 결함 대장\n'
+  thead
+} > "$D/ledger.md"
+printf '# 03 UI 축\n\n대비 검사 결과 임계값 미충족 조건 0건 — 이 축은 깨끗하다.\n' > "$D/03-ui.md"
+check "VPR-18: 축 파일의 「조건 0건」 문구는 자기모순이 아니다 → 통과" 0 "대장 무결" "$D"
+# 반대 방향: 판정을 지는 파일(요약)의 「조건 0건」은 여전히 자기모순 — 위치가 메시지에 실린다
+printf '# 요약\n\n**판정** 조건부 출하 가능\n\n남은 조건 0건 — 전부 닫았다.\n' > "$D/00-summary.md"
+out=$(bash "$LINT" "$D" 2>&1); rc=$?
+if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q '00-summary.md:'; then
+  PASS=$((PASS + 1)); echo "PASS  VPR-18: 요약의 조건 0건 → 자기모순 + 위치 표기"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  VPR-18: 요약 자기모순 미검출 또는 위치 없음 (exit=$rc)"
+  printf '%s\n' "$out" | sed 's/^/      /'
+fi
+# VPR-26(7R): 모순 검사 범위 = 게시 md 범위 — ledger.md 와 readiness.md 가 공존하면
+# readiness.md 의 「조건 0건」도 잡아야 한다(예전엔 검사는 비켜 가고 렌더에는 실렸다)
+D="$TMP/vpr26"; mkdir -p "$D"
+{ printf '# 검증 리포트\n\n**갱신** 2026-08-27 · **판정** 조건부 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n## 게이트 (착수 전 확정)\n| 게이트 | 목표 |\n|---|---|\n| G1 | fail 0 |\n\n## 남은 조건\n\n- 담당자가 스모크를 확인한다\n\n## 결함 대장\n'
+  thead
+} > "$D/ledger.md"
+printf '# 경량 잔재\n\n**갱신** 2026-08-27 · **판정** 조건부 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n남은 조건 0건 — 출하 전 충족해야 할 조건은 없다.\n' > "$D/readiness.md"
+out=$(bash "$LINT" "$D" 2>&1); rc=$?
+if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q 'readiness.md:'; then
+  PASS=$((PASS + 1)); echo "PASS  VPR-26: 공존 readiness.md 의 조건 0건 → 모순 검출 + 위치"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  VPR-26: 공존 파일 모순 미검출 (exit=$rc)"
+  printf '%s\n' "$out" | sed 's/^/      /'
+fi
+# VPR-27(8R): 모순 스캔은 표 행·이력 절·합성어에 오발화하면 안 된다(과차단 방지)
+mk27() { # <dir> <추가 본문>
+  mkdir -p "$1"
+  { printf '# 검증 리포트\n\n**갱신** 2026-08-27 · **판정** 조건부 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n## 게이트 (착수 전 확정)\n| 게이트 | 목표 |\n|---|---|\n| G1 | fail 0 |\n\n## 남은 조건\n\n- 담당자가 스모크를 확인한다\n\n'
+    printf '%s\n' "$2"
+    printf '\n## 결함 대장\n'; thead
+  } > "$1/readiness.md"
+}
+mk27 "$TMP/vpr27a" '| 항목 | 비고 |
+|---|---|
+| 참고 | 재현 조건: 없음 (항상 재현) |'
+check "VPR-27: 표 셀의 「재현 조건: 없음」 → 모순 아님" 0 "대장 무결" "$TMP/vpr27a/readiness.md"
+mk27 "$TMP/vpr27b" '## 이력
+
+- 7R: 남은 조건 0건 이었다(그 뒤 새 결함이 나왔다)'
+check "VPR-27: 이력 절의 「남은 조건 0건 이었다」 → 모순 아님" 0 "대장 무결" "$TMP/vpr27b/readiness.md"
+mk27 "$TMP/vpr27c" '선행 전제조건 0건으로 착수했다.'
+check "VPR-27: 합성어 「전제조건 0건」 → 모순 아님" 0 "대장 무결" "$TMP/vpr27c/readiness.md"
+D="$TMP/vpr27d"; mkdir -p "$D"
+{ printf '# 검증 리포트\n\n**갱신** 2026-08-27 · **판정** 조건부 출하 가능 · **open BLOCKER** 0 · **open 전체** 0\n\n## 게이트 (착수 전 확정)\n| 게이트 | 목표 |\n|---|---|\n| G1 | fail 0 |\n\n## 남은 조건\n\n- 담당자가 스모크를 확인한다\n\n## 결함 대장\n'
+  thead
+  echo '| B-1 | LOW | 04 | 재현 조건: 없음 — 항상 재현 | open | code | `x.md` | — |'
+} > "$D/readiness.md"
+check "VPR-27: 대장 행 「한 줄」칸의 조건 문구 → 모순 아님" 0 "대장 무결" "$D/readiness.md"
+# VPR-28(9R): 낱말 경계는 합성어만 배제한다 — 강조·인용·괄호·탭 접두의 진짜 모순
+# (「**조건 0건**」 등)을 놓치면 조건 0건짜리 조건부 GO 가 게시까지 도달한다(9R 실측 회귀).
+_i=0
+for _p in '**조건 0건**' '「조건 0건」' '`조건 0건`' '(조건 0건)' '_조건 0건_' '**0 conditions**' "$(printf '\t')조건 0건"; do
+  _i=$((_i+1)); D="$TMP/vpr28-$_i"
+  mk27 "$D" "$_p"
+  check "VPR-28: 기호 접두 모순 $_i ($_p) → 위반" 1 "R11" "$D/readiness.md"
+done
+# VPR-29(10R): 「조건: 없음」 모순 분기는 조건~콜론 사이의 강조·괄호도 허용해야 한다 —
+# 템플릿 권장 표기 「**남은 조건**(조건부일 때만): 없음」이 이 틈으로 게시까지 도달했다.
+_i=0
+for _p in '**남은 조건**(조건부일 때만): 없음' '**남은 조건**: 없음' '**남은 조건**: 해당 없음'; do
+  _i=$((_i+1)); D="$TMP/vpr29-$_i"
+  mk27 "$D" "$_p"
+  check "VPR-29: 템플릿형 조건 없음 $_i → R11 모순" 1 "R11" "$D/readiness.md"
+done
+# 반대 방향: 같은 템플릿형에 진짜 조건이 붙으면 통과(vpr07a 와 동일 계열 재확인)
+D="$TMP/vpr29-ok"; mk27 "$D" '**남은 조건**(조건부일 때만): ① 담당자가 롤백을 확인한다'
+check "VPR-29: 템플릿형 + 진짜 조건 → 통과" 0 "대장 무결" "$D/readiness.md"
+# VPR-22(6R): --strict 는 인자 순서와 무관하게 적용돼야 한다 — 예전엔 경로 뒤 --strict 가
+# 조용히 무시돼 범위 통제가 사용자 모르게 꺼졌다(vpr 도움말이 가르치는 순서가 그 형태였다).
+D="$TMP/vpr22"; mkdir -p "$D/r"; echo "escaped" > "$D/out.log"
+{ hdr 0 "조건부 출하 가능"; thead
+  echo '| Z-01 | MED | 06 | 탈출 인용 | open | measured | `../out.log:1` | — |'
+} > "$D/r/ledger.md"
+out=$(bash "$LINT" "$D/r" --strict 2>&1); rc=$?
+if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q 'strict'; then
+  PASS=$((PASS + 1)); echo "PASS  VPR-22: 경로 뒤 --strict 도 적용된다"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  VPR-22: 경로 뒤 --strict 무시 (exit=$rc)"
+fi
+out=$(bash "$LINT" "$D/r/ledger.md" --strcit 2>&1); rc=$?
+if [ "$rc" = 2 ] && printf '%s' "$out" | grep -q '알 수 없는 옵션'; then
+  PASS=$((PASS + 1)); echo "PASS  VPR-22: 미지 옵션(--strcit) → exit 2"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  VPR-22: 미지 옵션 무경고 수용 (exit=$rc)"
+fi
+out=$(bash "$LINT" "$D/r/ledger.md" 잉여인자 2>&1); rc=$?
+if [ "$rc" = 2 ] && printf '%s' "$out" | grep -q '대상은 하나만'; then
+  PASS=$((PASS + 1)); echo "PASS  VPR-22: 잉여 인자 → exit 2"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  VPR-22: 잉여 인자 무경고 수용 (exit=$rc)"
+fi
+# VPR-16: strict 범위 밖 인용에 「파일 부재」 오발화 금지(실존 파일이다 — strict 메시지가 정본)
+D="$TMP/vpr16"; mkdir -p "$D/r"; echo "escaped" > "$D/out.log"
+{ hdr 0 "조건부 출하 가능"; thead
+  echo '| X-01 | MED | 06 | 탈출 인용 | open | measured | `../out.log:1` | — |'
+} > "$D/r/ledger.md"
+out=$(bash "$LINT" --strict "$D/r" 2>&1); rc=$?
+if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q 'strict' && ! printf '%s' "$out" | grep -q '파일 부재'; then
+  PASS=$((PASS + 1)); echo "PASS  VPR-16: strict 범위 밖 인용에 '파일 부재' 오발화 없음"
+else
+  FAIL=$((FAIL + 1)); echo "FAIL  VPR-16: 오발화 잔존 또는 미차단 (exit=$rc)"
+  printf '%s\n' "$out" | sed 's/^/      /'
 fi
 
 
@@ -715,7 +977,7 @@ else
 fi
 
 # 갓 만든 뼈대는 행이 없으므로 lint 는 exit 2(검사 대상 없음) — 위반이 아니다
-check "new-report: 빈 뼈대는 '행 없음'(exit 2)" 2 "" "$D/readiness.md"
+check "new-report: 빈 뼈대도 lint 통과(0행 노트)" 0 "대장 0행" "$D/readiness.md"
 
 # 행 하나와 게이트 실측을 채우면 그대로 lint 를 통과해야 한다
 echo "run output" > "$D/evidence/t.log"

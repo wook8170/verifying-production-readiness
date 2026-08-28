@@ -181,25 +181,43 @@ def main():
         print(__doc__.strip()); return 2
     target = Path(args[0])
     if target.is_dir():
-        parts = [p for p in (target / "00-summary.md", target / "ledger.md") if p.is_file()]
+        # 후보에 경량 모드 산출물 readiness.md 포함 — lint 의 디렉터리 해석(ledger.md →
+        # readiness.md)과 같은 규칙. 예전에는 정식 모드 두 파일만 봐서, 문서가 안내하는
+        # `vpr render <디렉터리>` 가 경량 리포트에서 100% 실패했다(자기감사 VPR-02).
+        parts = [p for p in (target / "00-summary.md", target / "ledger.md", target / "readiness.md") if p.is_file()]
         if not parts:
-            print(f"렌더할 파일이 없습니다(00-summary.md·ledger.md): {target}"); return 2
+            print(f"렌더할 파일이 없습니다(00-summary.md·ledger.md·readiness.md): {target}"); return 2
         base, out = target, out_path or target / "report.html"
         ledger = target / "ledger.md"
+        if not ledger.is_file():
+            ledger = target / "readiness.md"
     elif target.is_file():
         parts, base, out = [target], target.parent, out_path or target.parent / "report.html"
         ledger = target
     else:
         print(f"대상이 없습니다: {target}"); return 2
     # lint 게이트 — 「lint 미통과 대장은 게시하지 않는다」를 자기보고가 아니라 기계로 강제.
-    # exit 2(대장 아님·데이터 행 없음)는 렌더를 막지 않는다 — 위반(exit 1)만 거부한다.
+    # fail-closed: 0이 아닌 **모든** 종료코드가 렌더를 막는다. 예전에는 exit 1 만 막았는데,
+    # 「어느 코드가 막는지 열거하는」 방식은 lint 가 판정 전에 이탈하는 새 경로가 생길 때마다
+    # 뚫린다 — 실제로 exit 2(빈 대장 조기 종료)로 근거 0건의 「출하 가능」이 게시됐다
+    # (자기감사 VPR-01, 같은 유형의 세 번째 발생). 검증을 못 마친 대장은 위반 대장과
+    # 같은 무게로 게시 금지다.
     lint = Path(__file__).resolve().parent / "ledger-lint.sh"
-    if ledger.is_file() and lint.is_file():
-        r = subprocess.run(["bash", str(lint), str(ledger)], capture_output=True, text=True)
-        if r.returncode == 1:
-            sys.stdout.write(r.stdout + r.stderr)
-            print("✗ lint 위반 대장 — 렌더·게시 거부(판정 무효 리포트는 공유 금지)")
-            return 1
+    # 게이트는 「검사할 수 있으면 검사」가 아니라 「검사할 수 없으면 거부」다. 예전의
+    # `if ledger.is_file() and lint.is_file():` 감싸기는 대장을 지우거나 lint 스크립트가
+    # 없는 배치에서 게이트가 통째로 사라져 「출하 가능」이 무검사로 게시됐다(자기감사
+    # VPR-05 — 근거 0건 GO 게시라는 같은 피해의 네 번째 발생). 검사 미실시 ≠ 통과.
+    if not lint.is_file():
+        print(f"✗ 검증 도구가 없다({lint}) — 검사 미실시 리포트는 렌더·게시 거부")
+        return 1
+    if not ledger.is_file():
+        print(f"✗ 대장 파일이 없다({ledger}) — 대장 없는 리포트는 검증 불가, 렌더·게시 거부")
+        return 1
+    r = subprocess.run(["bash", str(lint), str(ledger)], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.stdout.write(r.stdout + r.stderr)
+        print(f"✗ lint 미통과(exit {r.returncode}) — 렌더·게시 거부(판정 무효 리포트는 공유 금지)")
+        return 1
     title = "출하 검증 리포트"
     for p in parts:
         h = first_heading(read(p))
