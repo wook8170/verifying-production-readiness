@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- verifying-production-readiness: a gauge arc over a check mark (ship verdict). Two colors, no text. -->
+  <rect width="512" height="512" rx="112" fill="#1E2A32"/>
+  <g fill="none" stroke="#6CCB7E" stroke-width="48" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 96 336 A 160 160 0 0 1 416 336"/>
+    <path d="M 192 332 L 240 380 L 328 284"/>
+  </g>
+</svg>

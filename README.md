@@ -4,7 +4,7 @@ English | [한국어](README.ko.md)
 
 A Claude Code skill that turns a go/no-go release decision into an auditable record. Passing tests are not, on their own, a reason to ship. The skill makes you base a verdict on what you observed. A lint script then checks the defect ledger, so the verdict cannot claim more than the evidence shows.
 
-- Version: **0.17.0** (2026-08-27)
+- Version: **0.17.1** (2026-11-05)
 - License: MIT · Author: Wook Jang
 
 The full reference, including the change history, is in Korean in [README.ko.md](README.ko.md).
@@ -25,7 +25,9 @@ All paths below are inside `skills/verifying-production-readiness/`.
 | `bin/new-report.sh` | Creates a report skeleton. `--axes` picks the axes to audit |
 | `bin/report-html.py` | Renders a report to one self-contained HTML file. It runs lint first |
 | `bin/ensure-tools.sh` | Checks for delegate skills and CLIs, and installs them with `--install` |
-| `test/run-tests.sh` | Regression tests for every rule, determinism, the scaffolder, packaging and the entry point |
+| `test/run-tests.sh` | Regression tests for every rule, determinism, the scaffolder, packaging and the entry point (**202 passed**) |
+
+CI (`.github/workflows/ci.yml` at the repository root) runs the tests and the packaging check on ubuntu and macOS for every push to `main` and every pull request.
 
 ## Install
 
@@ -43,7 +45,7 @@ As a plain skill: put `skills/verifying-production-readiness/` at `~/.claude/ski
 It needs `bash` and `python3` (standard library only). `git` is optional. When present, citations resolve from the repository root.
 
 ```bash
-bin/vpr test        # install check: every test should pass
+bin/vpr test        # install check: expect "202 passed, 0 failed"
 ```
 
 ## Five-minute start

@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Local marketplace for verifying-production-readiness",
-    "version": "0.17.0"
+    "version": "0.17.1"
   },
   "plugins": [
     {
       "name": "verifying-production-readiness",
       "source": "./",
-      "version": "0.17.0",
+      "version": "0.17.1",
       "description": "Use when judging whether a system can ship to production — pre-launch sign-off, go/no-go calls, release readiness audits, \"can we ship this?\", \"확인만 하고 올리자\", or when resuming and iterating on a prior readiness report.",
       "author": {
         "name": "장욱 (Wook Jang)"
