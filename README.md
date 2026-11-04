@@ -91,10 +91,9 @@ Exit codes: `0` pass, `1` rule violation (do not publish), `2` lint could not ru
 
 ## Field records
 
-`docs/` holds two records of the skill in use:
+`docs/` holds a record of the skill in use:
 
 - `2026-08-22-skill-benchmark.html`: a comparison with other verification tools, based on four rounds of real use.
-- `2026-08-23-third-party-validation.md`: a light-mode audit of a codebase the skill had never seen. The target is anonymized.
 
 ## License
 
