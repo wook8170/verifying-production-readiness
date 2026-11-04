@@ -1,0 +1,246 @@
+<title>출하 검증 스킬 벤치마크</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f4f6f5;
+    --surface: #fdfefe;
+    --surface2: #e7edeb;
+    --ink: #1b2321;
+    --ink-soft: #55635f;
+    --line: #d3dcd9;
+    --accent: #0e7c6b;        /* measurement teal — 계측·검증의 색 */
+    --accent-ink: #0a5e51;
+    --go: #2e7d43;
+    --cond: #b3830b;
+    --nogo: #b3372b;
+    --unv: #5c6370;
+    --chip-bg: #dde5e2;
+    --code-bg: #e7edeb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141a18; --surface: #1b2320; --surface2: #232c29;
+      --ink: #e4ebe8; --ink-soft: #9aa8a3; --line: #313b38;
+      --accent: #34b7a2; --accent-ink: #5fcbb8;
+      --go: #6cc285; --cond: #d9ad3c; --nogo: #e0705f; --unv: #97a1ac;
+      --chip-bg: #28322e; --code-bg: #101614;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141a18; --surface: #1b2320; --surface2: #232c29;
+    --ink: #e4ebe8; --ink-soft: #9aa8a3; --line: #313b38;
+    --accent: #34b7a2; --accent-ink: #5fcbb8;
+    --go: #6cc285; --cond: #d9ad3c; --nogo: #e0705f; --unv: #97a1ac;
+    --chip-bg: #28322e; --code-bg: #101614;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif;
+    font-size: 15.5px; line-height: 1.72; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 46px 22px 80px; }
+  code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.85em;
+    background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  /* header */
+  .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--accent-ink); display: flex; align-items: center;
+    gap: 10px; margin-bottom: 16px; }
+  .eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  h1 { font-family: "Fraunces", Georgia, serif; font-size: 37px; line-height: 1.15; margin: 0 0 10px;
+    font-weight: 600; letter-spacing: -0.015em; text-wrap: balance; }
+  .sub { color: var(--ink-soft); margin: 0 0 8px; font-size: 16px; }
+  .meta { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-soft); }
+  /* verdict */
+  .verdict { margin: 30px 0 6px; background: var(--surface); border: 1px solid var(--line);
+    border-left: 4px solid var(--accent); padding: 20px 24px; }
+  .verdict-label { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; }
+  .verdict .headline { font-family: "Fraunces", Georgia, serif; font-size: 20px; font-weight: 600;
+    margin: 0; line-height: 1.35; letter-spacing: -0.01em; }
+  .verdict p { margin: 10px 0 0; }
+  /* scores */
+  .scores { display: grid; gap: 9px; margin: 28px 0 4px; }
+  .score { display: grid; grid-template-columns: 132px 1fr 40px; gap: 12px; align-items: center; }
+  .score .name { font-size: 13.5px; font-weight: 500; }
+  .score .track { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .score .fill { height: 100%; background: var(--accent); border-radius: 4px; }
+  .score .val { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; text-align: right;
+    color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .score-note { font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; }
+  /* sections */
+  h2 { font-family: "Fraunces", Georgia, serif; font-size: 23px; font-weight: 600; letter-spacing: -0.01em;
+    margin: 48px 0 12px; padding-top: 20px; border-top: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 12px; }
+  h2 .tag { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500;
+    color: var(--accent-ink); letter-spacing: 0.08em; }
+  h3 { font-size: 15px; margin: 24px 0 6px; }
+  p { margin: 10px 0; }
+  ul { margin: 8px 0; padding-left: 20px; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--accent-ink); }
+  .soft { color: var(--ink-soft); }
+  b, strong { font-weight: 700; }
+  /* chips */
+  .chip { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    padding: 1px 8px; border-radius: 20px; background: var(--chip-bg); letter-spacing: 0.03em;
+    vertical-align: 1px; }
+  .chip.go { color: var(--go); } .chip.cond { color: var(--cond); }
+  .chip.nogo { color: var(--nogo); } .chip.unv { color: var(--unv); }
+  /* verdict-grammar strip */
+  .grammar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 16px 0; }
+  .gcard { background: var(--surface); border: 1px solid var(--line); border-radius: 7px;
+    padding: 11px 12px; border-top: 3px solid var(--line); }
+  .gcard.go { border-top-color: var(--go); } .gcard.cond { border-top-color: var(--cond); }
+  .gcard.nogo { border-top-color: var(--nogo); } .gcard.unv { border-top-color: var(--unv); }
+  .gcard .t { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.02em; margin-bottom: 3px; }
+  .gcard.go .t { color: var(--go); } .gcard.cond .t { color: var(--cond); }
+  .gcard.nogo .t { color: var(--nogo); } .gcard.unv .t { color: var(--unv); }
+  .gcard .d { font-size: 11.5px; color: var(--ink-soft); line-height: 1.5; }
+  /* tables */
+  .tblwrap { overflow-x: auto; margin: 16px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 560px; }
+  th { text-align: left; font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500;
+    padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); vertical-align: bottom; }
+  td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.hl { font-weight: 600; }
+  .mk { color: var(--go); font-weight: 700; } .xk { color: var(--ink-soft); }
+  .pk { color: var(--cond); }
+  /* personas */
+  .personas { display: grid; gap: 12px; margin: 16px 0; }
+  .persona { background: var(--surface); border: 1px solid var(--line); padding: 14px 16px;
+    border-radius: 7px; }
+  .persona .who { font-weight: 700; font-size: 14px; display: flex; justify-content: space-between;
+    gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .persona p { margin: 6px 0 0; font-size: 13.5px; }
+  .quote { border-left: 3px solid var(--accent); padding: 3px 0 3px 15px; margin: 16px 0;
+    color: var(--ink-soft); font-family: "Fraunces", Georgia, serif; font-size: 17px;
+    font-style: italic; line-height: 1.5; }
+  .foot { margin-top: 52px; padding-top: 14px; border-top: 1px solid var(--line);
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-soft); }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Skill Benchmark · 4라운드 실사용 기반</div>
+  <h1>출하 검증 스킬 벤치마크</h1>
+  <p class="sub"><code>verifying-production-readiness</code> — 효용성·가치·실효성·사용성·가성비·시장 반응을 대안 도구군과 대조 평가</p>
+  <p class="meta">약 1,220줄(SKILL·axes·hygiene·template·adapters + lint/render/tools 스크립트) · 11축 · 판정 4어휘 · lint R1–R9 · 2026-08-22</p>
+
+  <div class="verdict">
+    <div class="verdict-label">종합 판정</div>
+    <p class="headline">"판정의 신뢰성을 기계로 담보하는 드문 도구 — 대부분의 QA 스킬이 리포트를 낼 때, 이건 그 리포트가 거짓말을 못 하게 만든다."</p>
+    <p>시장의 검증 도구 대부분은 <b>발견을 잘 찾는 데</b> 최적화돼 있다. 이 스킬의 차별점은 발견이 아니라 <b>판정의 무결성</b>이다 — 게이트를 결과 전에 못 박고(Iron Rule 1), <code>measured</code> 근거 없이는 GO 를 못 내며(기계 검사 <b>R8</b> — 2026-08-23 외부 감정이 «이 문장이 문서에만 있고 코드에 없다»를 실측해 그때 구현됐다. 그 전까지 이 줄은 사실이 아니었다), 다세션에 걸쳐 결함 대장을 이어받는다. 이번 4라운드 실사용에서 그 값을 직접 봤다: lint 가 내 인용 오류를 잡았고, 판정 문법이 잘못된 GO 를 되돌렸으며, 적대적 재감사가 앞선 두 라운드가 놓친 출하 차단 BLOCKER 를 포착했다. <b>반면 무겁다</b> — 의식(ceremony) 비용과 학습 곡선이 바이브코딩 대중과는 정면으로 어긋난다. 넓게 팔릴 물건이 아니라, 출하 사고를 겪어 본 팀에 깊게 박히는 물건이다.</p>
+  </div>
+
+  <div class="scores">
+    <div class="score"><span class="name">효용성</span><div class="track"><div class="fill" style="width:94%"></div></div><span class="val">4.7</span></div>
+    <div class="score"><span class="name">가치 (희소성)</span><div class="track"><div class="fill" style="width:90%"></div></div><span class="val">4.5</span></div>
+    <div class="score"><span class="name">실효성</span><div class="track"><div class="fill" style="width:80%"></div></div><span class="val">4.0</span></div>
+    <div class="score"><span class="name">사용성</span><div class="track"><div class="fill" style="width:60%"></div></div><span class="val">3.0</span></div>
+    <div class="score"><span class="name">가성비</span><div class="track"><div class="fill" style="width:86%"></div></div><span class="val">4.3</span></div>
+    <div class="score"><span class="name">시장 적합 (대중)</span><div class="track"><div class="fill" style="width:56%"></div></div><span class="val">2.8</span></div>
+  </div>
+  <p class="score-note">5점 척도. 시장 적합은 <b>대중(바이브코더)</b> 기준이라 낮다 — 타깃 세그먼트(시니어·규제·플랫폼팀) 기준으로는 4.6.</p>
+
+  <h2><span class="tag">01</span>무엇을 겨냥하나 <span class="chip go">효용 4.7</span></h2>
+  <p>한 문장으로: <b>"초록색 테스트는 출하 근거가 아니다"</b> 를 도구로 만든 것. 겨냥하는 아픔은 검증 도구 시장의 사각지대에 정확히 있다.</p>
+  <ul>
+    <li><b>거짓 GO 방지.</b> 테스트·타입·"스테이징에서 되던데"는 <i>상상한 실패</i>만 검사한다. 이 스킬은 부하·복구·권한·동시성·공급망을 축으로 강제해 상상 밖을 본다.</li>
+    <li><b>판정의 위조 차단.</b> <code>measured</code> 칸은 지어내기 가장 쉬운 곳이다. lint R1(measured 행은 실존 <code>파일:줄</code> 필수)·R7(0바이트 증거 차단)이 이를 기계로 막는다 — 자기보고에 맡기지 않는다.</li>
+    <li><b>세션 단절 내성.</b> 판정→수정→재판정을 여러 세션에 걸쳐 잇는다. 결함 대장의 <code>open</code> 항목이 다음 세션의 할 일이다. 대부분의 QA 스킬은 1세션 완결형이라 이 연속성이 없다.</li>
+    <li><b>축 망각 방지.</b> 즉석 축 생성을 금하고 11축을 고정. 베이스라인 실험에서 통째로 빠졌던 축(접근성·E2E·논리 불변식·결정성·공급망·관측성·비밀 스캔)을 강제한다.</li>
+  </ul>
+
+  <h2><span class="tag">02</span>실사용 증거 — 4라운드가 드러낸 것</h2>
+  <p>이 벤치마크의 근거는 문서 독해가 아니라 <b>이 스킬로 실제 판정을 4번 돌린 기록</b>이다. 각 라운드가 스킬의 특정 장치를 실증했다.</p>
+  <div class="tblwrap"><table>
+    <tr><th>라운드</th><th>일어난 일</th><th>실증한 장치</th></tr>
+    <tr><td>재진입 lint</td><td>재진입 첫 명령 lint 가 R1 위반 10건 — 원인은 대장이 아니라 <b>실행 CWD</b>였다(상대경로 인용 붕괴)</td><td class="hl">R1 이 인용 무결을 실제로 검사</td></tr>
+    <tr><td>PERF 재측정</td><td>측정 창 <code>load&lt;2</code> 조건이 현실에서 안 옴 → 상한 게이트 논증(a fortiori)으로 채택, 사유 명기</td><td class="hl">측정 위생 규율 + 임계값 변경 금지</td></tr>
+    <tr><td>판정 승격</td><td>"조건부 출하 가능 — 남은 조건 0건" 이라는 <b>문법 모순</b>을 포착 → GO 로 정정</td><td class="hl">판정 4어휘 고정 + R6 정합</td></tr>
+    <tr><td>적대 재감사</td><td>앞 두 라운드가 GO 로 낸 빌드에서 <b>출하 차단 BLOCKER</b>(정책 파일 자기 무장해제)를 42-에이전트 재감사가 포착</td><td class="hl">Iron Rule 3 — 정적 감사만으로 판정 금지</td></tr>
+  </table></div>
+  <p>마지막 줄이 이 스킬의 존재 이유를 압축한다: <b>소스를 전량 읽고도 안 보이던 결함을, 실제로 제품을 적대적으로 굴려 봐야 잡았다.</b> 그리고 스킬은 그 GO 를 조용히 덮지 않고 <b>철회</b>로 대장에 남기게 했다(Iron Rule 7 — 감사도 틀린다).</p>
+
+  <h2><span class="tag">03</span>벤치마킹 — 대안 도구군 대비 <span class="chip go">가치 4.5</span></h2>
+  <p>같은 "품질·검증" 범주의 도구들과 대조하면 포지션이 분명해진다. 핵심 축은 <b>판정 무결성</b>과 <b>다세션 연속성</b> — 여기서 겹치는 도구가 거의 없다.</p>
+  <div class="tblwrap"><table>
+    <tr><th>도구</th><th>초점</th><th>판정 무결성</th><th>다세션</th><th>축 강제</th><th>비웹</th></tr>
+    <tr><td class="hl">verifying-production-readiness</td><td>출하 go/no-go</td><td class="mk">대장+lint R1–R9</td><td class="mk">재진입 절차</td><td class="mk">11축 고정</td><td class="mk">어댑터 有</td></tr>
+    <tr><td>gstack <code>/qa</code>·<code>/qa-only</code></td><td>웹 QA·자동수정</td><td class="pk">헬스 점수(강)</td><td class="xk">단일</td><td class="xk">웹 위주</td><td class="xk">웹 전용</td></tr>
+    <tr><td>gstack <code>/cso</code></td><td>보안 심화(1축)</td><td class="pk">신뢰 게이트</td><td class="pk">트렌드 추적</td><td class="xk">보안만</td><td class="pk">부분</td></tr>
+    <tr><td>gstack <code>/health</code></td><td>지표 대시보드</td><td class="xk">점수화(판정 X)</td><td class="pk">트렌드</td><td class="xk">도구 래핑</td><td class="pk">부분</td></tr>
+    <tr><td>omc <code>verifier</code>/<code>verify</code></td><td>완료 검증 전략</td><td class="pk">증거 기반</td><td class="xk">단일</td><td class="xk">없음</td><td class="pk">범용</td></tr>
+    <tr><td>superpowers <code>verification-before-completion</code></td><td>완료 전 규율</td><td class="pk">원칙(사람)</td><td class="xk">단일</td><td class="xk">없음</td><td class="pk">범용</td></tr>
+    <tr><td>CI green + 릴리스 체크리스트</td><td>자동 게이트</td><td class="xk">"상상한 실패"만</td><td class="pk">지속</td><td class="xk">팀별</td><td class="pk">범용</td></tr>
+  </table></div>
+  <p><b>해석.</b> <code>/qa</code>·<code>/cso</code> 는 <b>한 축을 깊게</b> 판다(웹 QA·보안) — 이 스킬은 그것들을 <b>위임 후보로 흡수</b>하도록 설계됐다(axes.md 축↔도구 매핑). 즉 경쟁이 아니라 상위 오케스트레이터다. 겹치는 이가 없는 칸은 두 개 — <b>판정 무결성을 기계로 검사</b>하는 것과, <b>다세션 재진입</b>. 이 둘이 이 스킬의 해자(moat)다.</p>
+
+  <h2><span class="tag">04</span>판정 문법 — 이 스킬의 서명</h2>
+  <p>대부분의 검증 도구는 "통과/실패"의 2치거나 점수(7.8/10)를 낸다. 이 스킬은 <b>판정을 4개 어휘로 고정</b>하고, 그중 하나(근거 부재)를 특히 강조한다 — "고칠 게 있다"와 "볼 수단이 없다"를 섞으면 다음 사람이 없는 버그를 찾기 때문이다.</p>
+  <div class="grammar">
+    <div class="gcard go"><div class="t">GO</div><div class="d">차단 0 · 전 게이트 초록 · 잔여는 백로그</div></div>
+    <div class="gcard cond"><div class="t">CONDITIONAL</div><div class="d">차단 0 · 관측 가능한 조건 N건을 출하 전 충족</div></div>
+    <div class="gcard nogo"><div class="t">NO-GO</div><div class="d">차단 ≥1 · 무엇이 차단인지 ID 로 지목</div></div>
+    <div class="gcard unv"><div class="t">UNVERIFIABLE</div><div class="d">결함이 아니라 <b>볼 수단이 없어</b> 판정 불가</div></div>
+  </div>
+  <p class="soft">lint R6 이 이 어휘를 단어 단위로 검사한다 — GO 인데 open BLOCKER 가 있으면 위반. 이번 4라운드에서 "조건부인데 조건 0건" 모순을 잡아 GO 로 승격시킨 게 바로 이 규율이다.</p>
+
+  <h2><span class="tag">05</span>실효성 — 강제가 정말 강제인가 <span class="chip cond">4.0</span></h2>
+  <p>잊는 것·지어내는 것은 강하게 막고, <b>구조적 사각은 부분적으로만</b> 막는다.</p>
+  <ul>
+    <li><span class="chip go">막는다</span> <code>measured</code> 위조·부재: R1(실존 파일:줄)·R7(0바이트 증거)·R8(GO 는 실측 근거 필수)·R9(게이트 실측 칸)이 기계로 검사. "touch 로 만든 껍데기 증거"까지 차단.</li>
+    <li><span class="chip go">막는다</span> 사후 승인: 게이트를 결과 전에 <code>gates.md</code> 로 고정. 결과 보고 임계값 낮추면 그 사실을 리포트에 남기게 강제.</li>
+    <li><span class="chip cond">부분</span> <b>자기 채점의 사각.</b> 이번에 실증됐다 — 감사자가 "자기가 막힐 거라 예상한 것" 목록으로 자기 작업을 채점하면 목록 밖(정책 파일 자체·트랙 밖 경로)은 구조적으로 안 보인다. 스킬은 "독립 적대 감사"를 <b>권고</b>하지만 <b>강제하는 장치가 없다</b>. 이번엔 사람이 별도 세션을 띄워 잡았다.</li>
+    <li><span class="chip cond">한계</span> <b>lint 는 형식만 본다.</b> R1 은 인용된 파일의 존재·줄 범위·비어있지 않음까지만 검사한다 — 그 줄이 <i>진짜 근거인지</i>는 사람의 몫이다. 스킬도 이를 자인한다("내용이 진짜 근거인지는 재진입 세션이 의심하는 몫").</li>
+  </ul>
+
+  <h2><span class="tag">06</span>사용성 <span class="chip cond">3.0</span> · 가성비 <span class="chip go">4.3</span></h2>
+  <p><b>사용성의 벽은 의식 비용이다.</b> 개념 어휘가 두껍다 — 11축·근거 등급 3종·대장 상태 6종·Iron Rule 7개·lint R1–R9·재진입 절차·측정 위생. 처음 판정 한 번을 제대로 내려면 문서 5개를 관통해야 한다. <b>경량 모드</b>(축 ④⑧⑨+닿는 축, 파일 하나)가 이 벽을 상당히 낮추지만, 그 경량 모드조차 게이트 선확정·근거 등급·lint 는 유지한다 — 즉 <b>규율은 타협하지 않는다.</b></p>
+  <p><b>가성비는 비대칭이 지배한다.</b> 비용: 다축 감사·실측·대장 유지에 세션당 상당한 토큰과 시간. 효익: <b>거짓 GO 출하 1회를 막으면 회수된다.</b> 이번에 실제로 BLOCKER 있는 빌드를 GO 로 낼 뻔한 걸 막았다 — 그 한 번이 스킬 사용 비용 전체를 정당화한다. 손익분기는 <b>"출하 리스크가 실재하는 릴리스"</b> 근처다. 개인 토이 프로젝트엔 과하고, 되돌리기 비용이 큰 릴리스엔 싸다.</p>
+
+  <h2><span class="tag">07</span>시장 반응 예측</h2>
+  <div class="personas">
+    <div class="persona">
+      <div class="who">시니어·테크리드·SRE <span class="chip go">핵심 팬층</span></div>
+      <p>"green = ship 을 깨는 규율"에 반응. 게이트 선확정·measured 강제·판정 4어휘가 이들이 회고에서 배운 것을 코드로 옮긴 것이다. 입소문의 진원지.</p>
+    </div>
+    <div class="persona">
+      <div class="who">규제·핀테크·의료·플랫폼팀 <span class="chip go">열광</span></div>
+      <p>결함 대장의 <b>감사 추적성</b>(안정적 ID·근거 등급·닫은 증거)에 반응. "판정에 서명 가능한 궤적이 남는다." 컴플라이언스가 요구하는 바로 그 형태다.</p>
+    </div>
+    <div class="persona">
+      <div class="who">QA 엔지니어 <span class="chip cond">공감 + 아쉬움</span></div>
+      <p>11축·근거 등급에 깊이 공감하나 "축 감사가 결국 수동"이라는 점을 지적. lint 가 형식만 보는 것도 안다 — 자동화 여지를 가장 예리하게 본다.</p>
+    </div>
+    <div class="persona">
+      <div class="who">바이브코더·인디 해커·해커톤 <span class="chip nogo">과함 · 이탈</span></div>
+      <p>"출하 검증에 문서 5개와 lint 를?" 대부분 <code>/qa</code> 한 방으로 충분하다고 느낀다. 이 스킬은 애초에 이들을 위한 물건이 아니다 — 경량 모드조차 무겁게 느낀다.</p>
+    </div>
+    <div class="persona">
+      <div class="who">회의론자 <span class="chip cond">날카로운 반론</span></div>
+      <p>"결국 사람이 measured 를 채우고 lint 는 파일 존재만 본다 — 성실한 거짓말은 못 막는다." 정당한 지적이다. 스킬의 방어는 '다세션 재진입 세션이 의심하라'인데, 그 의심조차 사람에 의존한다.</p>
+    </div>
+  </div>
+  <p>예상 밈 스펙트럼: <span class="soft">"출하 판정계의 변호사 — 근거 없으면 한 발도 못 나간다"</span> ↔ <span class="soft">"체크리스트에 체크리스트를 씌운 관료제"</span>. 논쟁의 축은 항상 같다 — <b>규율의 값이 의식의 비용을 넘느냐.</b> 되돌리기 비용이 큰 릴리스에서는 넘고, 아니면 안 넘는다.</p>
+
+  <h2><span class="tag">08</span>개선하면 시장이 넓어질 지점</h2>
+  <ul>
+    <li><b>적대 감사를 절차로 강제.</b> 이번에 실증된 최대 사각(자기 채점)을 스킬이 <b>권고→필수</b>로 올리면 — 예: "GO 직전 독립 세션 1회 적대 재감사"를 판정 전 게이트로 — 실효성이 4.0→4.6.</li>
+    <li><b>lint 의 근거 검증 강화.</b> 현재 R1 은 파일 존재만. 인용 줄이 결함 설명과 <b>토큰 겹침</b>이라도 보면 "빈 줄 인용"을 넘어 "무관한 줄 인용"까지 잡는다.</li>
+    <li><b>온보딩 10분 경험.</b> 문서 5개 대신 "첫 판정을 손잡고 끝까지" 가는 튜토리얼 하나가 사용성 3.0→3.8.</li>
+    <li><b>축 위임 자동 배선.</b> axes.md 의 축↔도구 매핑을 문서가 아니라 <b>실제 디스패치</b>로 — <code>/qa</code>·<code>/cso</code> 를 축 감사에서 자동 호출하면 "수동" 지적이 해소된다.</li>
+  </ul>
+
+  <h2><span class="tag">09</span>벤치마크 근거</h2>
+  <ul>
+    <li>스킬 전량 열람: <code>SKILL.md</code>·<code>axes.md</code>(11축)·<code>measurement-hygiene.md</code>·<code>report-template.md</code>·<code>media-adapters.md</code> + <code>bin/</code>(ledger-lint R1–R9·report-html·ensure-tools).</li>
+    <li><b>4라운드 실사용 궤적</b>: 같은 대상(king-wjang-harness 플러그인)을 이 스킬로 조건부→GO→GO 철회→NO-GO 까지 판정. lint·재측정·판정 문법·철회를 전부 직접 구동.</li>
+    <li>대안 대조: 세션에 로드된 gstack(<code>/qa</code>·<code>/cso</code>·<code>/health</code>·<code>/benchmark</code>)·oh-my-claudecode(<code>verifier</code>·<code>verify</code>)·superpowers(<code>verification-before-completion</code>) 스킬 명세.</li>
+    <li>이해충돌 고지: 이 스킬과 벤치마크 대상 플러그인은 의뢰인 본인 제작이다 — 평가는 스킬 소스·실사용 기록·대안 명세에만 근거했다.</li>
+  </ul>
+
+  <div class="foot">verifying-production-readiness benchmark · 4 rounds hands-on · appraised 2026-08-22 · claude fable 5</div>
+</div>
