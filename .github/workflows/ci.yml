@@ -1,0 +1,28 @@
+# 자체 시험 CI — ubuntu 와 macOS 에서 같은 시험을 돌린다.
+# macOS 의 BSD awk · grep 과 Linux 의 GNU 계열 도구는 동작이 다를 수 있다.
+# 그래서 한쪽에서만 통과하는 회귀를 막으려고 두 운영체제를 함께 돌린다.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: skills/verifying-production-readiness
+    steps:
+      - uses: actions/checkout@v4
+      - name: 자체 시험 (전 규칙 + 결정성 + 스캐폴더 + 조립 + 진입점)
+        run: bash test/run-tests.sh
+      - name: 배포 조립본에서도 시험이 도는지
+        run: |
+          bash bin/package.sh "$RUNNER_TEMP/pkg"
+          bash "$RUNNER_TEMP/pkg/skills/verifying-production-readiness/test/run-tests.sh"

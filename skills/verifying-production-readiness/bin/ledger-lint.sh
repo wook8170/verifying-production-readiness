@@ -229,9 +229,14 @@ verdict_unmarked() {   # $1 = 펜스 걷은 파일 → 분류 가능한 첫 후�
     awk '/^#+[ \t]*(판정|Verdict)[ \t]*:?[ \t]*$/ { f = 1; next }
          f && /^#/ { f = 0 }
          f && NF { print; n++; if (n >= 6) exit }' "$1"
+    # 키 비교는 `==` 가 아니라 정규식 일치로 한다. macOS 의 BSD awk 는 문자열 `==` 를
+    # strcoll 로 비교하는데, UTF-8 로캘의 정렬 규칙이 한글 음절을 서로 같다고 본다.
+    # 그래서 「항목」·「상태」 같은 다른 한글 키도 「판정」과 같다고 나와, 머리 행의 값을
+    # 판정 후보로 집고 끝났다(실측: macOS 에서만 R12 표 행 시험 실패, Linux mawk·gawk 는 통과).
+    # 정규식 일치는 정렬 규칙을 쓰지 않으므로 어느 awk·로캘에서도 같은 결과를 낸다.
     awk -F'|' '/^\|/ {
            k = $2; gsub(/^[ \t*_`]+|[ \t*_`]+$/, "", k)
-           if (k == "판정" || k == "Verdict") { v = $3; gsub(/^[ \t]+|[ \t]+$/, "", v); print v; exit } }' "$1"
+           if (k ~ /^(판정|Verdict)$/) { v = $3; gsub(/^[ \t]+|[ \t]+$/, "", v); print v; exit } }' "$1"
   } | while IFS= read -r cand; do
         case "$cand" in *"<"*|*"|"*) continue ;; esac   # 안 채운 골격의 자리표시자
         n=$(verdict_norm "$cand")
