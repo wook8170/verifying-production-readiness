@@ -76,7 +76,7 @@ cp "$SRC/README.md" "$OUT/README.md"
 python3 - "$OUT" "$NAME" "$VER" "$DESC" <<'PY'
 import json, sys
 out, name, ver, desc = sys.argv[1:5]
-author = {"name": "장욱 (Wook Jang)"}
+author = {"name": "Wook Jang"}
 plugin = {
     "name": name,
     "version": ver,

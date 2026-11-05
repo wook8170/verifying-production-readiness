@@ -1,15 +1,25 @@
 {
   "name": "verifying-production-readiness",
-  "version": "0.17.1",
-  "description": "Use when judging whether a system can ship to production — pre-launch sign-off, go/no-go calls, release readiness audits, \"can we ship this?\", \"확인만 하고 올리자\", or when resuming and iterating on a prior readiness report.",
+  "displayName": "Verifying Production Readiness",
+  "version": "0.17.2",
+  "description": "Audit skill for go/no-go release decisions. It bases the verdict on observed evidence across eleven axes and checks the defect ledger with a lint script, so the verdict cannot claim more than the evidence shows.",
   "author": {
-    "name": "장욱 (Wook Jang)"
+    "name": "Wook Jang",
+    "email": "wook81701@gmail.com",
+    "url": "https://github.com/wook8170"
   },
+  "homepage": "https://github.com/wook8170/verifying-production-readiness",
+  "repository": "https://github.com/wook8170/verifying-production-readiness",
+  "license": "MIT",
   "keywords": [
     "readiness",
     "release",
     "go-no-go",
     "audit",
     "quality-gate"
-  ]
+  ],
+  "icon": "./.claude-plugin/icon.png",
+  "documentationUrl": "https://github.com/wook8170/verifying-production-readiness#readme",
+  "supportUrl": "https://github.com/wook8170/verifying-production-readiness/issues",
+  "privacyPolicyUrl": "https://github.com/wook8170/verifying-production-readiness/blob/main/PRIVACY.md"
 }
