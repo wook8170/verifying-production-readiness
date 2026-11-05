@@ -4,6 +4,8 @@ English | [한국어](README.ko.md)
 
 A Claude Code skill that turns a go/no-go release decision into an auditable record. Passing tests are not, on their own, a reason to ship. The skill makes you base a verdict on what you observed. A lint script then checks the defect ledger, so the verdict cannot claim more than the evidence shows.
 
+![verifying-production-readiness demo: ledger-lint rejects a ship verdict while a BLOCKER is open, passes after the verdict becomes no-go, and vpr render produces the HTML report (sample data)](docs/demo.gif)
+
 - Version: **0.17.2** (2026-11-05)
 - License: MIT · Author: Wook Jang
 
@@ -38,7 +40,7 @@ claude plugin marketplace add wook8170/verifying-production-readiness
 claude plugin install verifying-production-readiness@verifying-production-readiness
 ```
 
-The same plugin is also listed in the [wook8170-plugins](https://github.com/wook8170/claude-plugins) marketplace together with king-wjang-harness and wb.
+The same plugin is also listed in the [wook8170-plugins](https://github.com/wook8170/claude-plugins) marketplace together with king-wjang-harness and lanekeeper.
 
 As a plain skill: put `skills/verifying-production-readiness/` at `~/.claude/skills/verifying-production-readiness/`. Claude Code finds it on its own.
 
