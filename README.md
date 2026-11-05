@@ -4,7 +4,7 @@ English | [한국어](README.ko.md)
 
 A Claude Code skill that turns a go/no-go release decision into an auditable record. Passing tests are not, on their own, a reason to ship. The skill makes you base a verdict on what you observed. A lint script then checks the defect ledger, so the verdict cannot claim more than the evidence shows.
 
-- Version: **0.17.1** (2026-11-05)
+- Version: **0.17.2** (2026-11-05)
 - License: MIT · Author: Wook Jang
 
 The full reference, including the change history, is in Korean in [README.ko.md](README.ko.md).
@@ -90,6 +90,37 @@ There are four verdicts: **ship**, **ship with conditions**, **do not ship**, an
 | R13 | Core axes cannot be excluded, and an excluded axis needs a reason under a passing verdict |
 
 Exit codes: `0` pass, `1` rule violation (do not publish), `2` lint could not run (also do not publish). Wrap publishing so that only exit `0` passes.
+
+## What it runs, sends, and fetches
+
+The plugin contains one skill and nothing else. It has no hooks, no MCP servers, no agents, and no commands, so nothing runs on its own when a session starts or a tool is used.
+
+### What it runs
+
+The scripts in `skills/verifying-production-readiness/bin/` run only when you run them, or when Claude runs them while following the skill. They need `bash` and `python3` (standard library only).
+
+| Script | What it does on your machine |
+|---|---|
+| `vpr` | Passes each subcommand to one of the scripts below |
+| `new-report.sh` | Creates `readiness.md` and `evidence/` (or, with `--full`, `docs/release-readiness/<date>/`) in the target folder. It never overwrites an existing report |
+| `ledger-lint.sh` | Reads the report and ledger and prints findings. It calls `git rev-parse` to find the repository root, and deletes only its own temporary files |
+| `report-html.py` | Runs the lint, then writes one self-contained HTML file next to the report (`report.html` by default) |
+| `package.sh` | Copies the skill into a new folder in plugin layout. It refuses to write into a folder that already exists |
+| `ensure-tools.sh` | Checks whether the delegate skills and the `gitleaks` CLI are present. With `--install` it runs the installs listed under "What it fetches" |
+| `test/run-tests.sh` | Runs the self-tests in temporary folders |
+
+### What it sends
+
+Nothing. No script opens a network connection, and the plugin collects no data. Reports stay as local files in the project you audit. The skill asks Claude to publish the rendered HTML report as a claude.ai Artifact so remote readers can see it. That step uses Claude's own Artifact tool in your session, and you see it like any other tool call.
+
+### What it fetches
+
+Only `ensure-tools.sh --install` downloads anything, and only when you or Claude run it with that flag:
+
+- `brew install gitleaks` through Homebrew, when `gitleaks` is missing and Homebrew is installed.
+- `claude plugin install <skill>` for a missing delegate skill (`qa`, `qa-only`, `browse`, `benchmark`, `cso`, `design-review`, `codex`, `canary`). It installs only from marketplaces you have already added, and never adds a marketplace.
+
+Without `--install`, the script only reports what is missing.
 
 ## Field records
 
